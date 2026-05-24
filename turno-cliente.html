@@ -31,7 +31,15 @@ body{font-family:'DM Sans',sans-serif;background:#faf8f3;color:#2e2c28;min-heigh
 .cs{font-size:12px;color:#9a9690;margin-top:2px}
 .cb{padding:20px}
 
-/* CALENDARIO */
+/* SEDE */
+.sede-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px}
+.sede-btn{border:2px solid #d8d5cc;border-radius:14px;padding:22px 16px;text-align:center;cursor:pointer;background:#fff;transition:all .18s;-webkit-tap-highlight-color:transparent}
+.sede-btn:active{transform:scale(.97)}
+.sede-btn.sel{border-color:#0f1f3d;background:#0f1f3d;color:#fff}
+.sede-nombre{font-family:'DM Serif Display',serif;font-size:20px;color:#0f1f3d;line-height:1.2}
+.sede-btn.sel .sede-nombre{color:#c9a84c}
+.sede-dir{font-size:12px;color:#9a9690;margin-top:6px;line-height:1.5}
+.sede-btn.sel .sede-dir{color:rgba(255,255,255,.6)}
 .cal-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
 .cal-mes{font-family:'DM Serif Display',serif;font-size:18px;color:#0f1f3d}
 .cal-nav-btn{width:36px;height:36px;border:1.5px solid #d8d5cc;border-radius:8px;background:#fff;cursor:pointer;font-size:18px;color:#5a5750;display:flex;align-items:center;justify-content:center}
@@ -132,21 +140,47 @@ body{font-family:'DM Sans',sans-serif;background:#faf8f3;color:#2e2c28;min-heigh
     <a href="panel-estudio-lena.html" style="position:absolute;right:0;top:50%;transform:translateY(-50%);font-size:11px;color:rgba(255,255,255,.3);text-decoration:none;letter-spacing:.05em" onmouseover="this.style.color='rgba(255,255,255,.6)'" onmouseout="this.style.color='rgba(255,255,255,.3)'">Acceso interno</a>
   </div>
   <div class="steps" id="steps">
-    <div class="sp active" id="sp1"><div class="sn" id="sn1">1</div>Día</div>
+    <div class="sp active" id="sp0"><div class="sn" id="sn0">1</div>Sede</div>
     <div class="sa">›</div>
-    <div class="sp" id="sp2"><div class="sn" id="sn2">2</div>Horario</div>
+    <div class="sp" id="sp1"><div class="sn" id="sn1">2</div>Día</div>
     <div class="sa">›</div>
-    <div class="sp" id="sp3"><div class="sn" id="sn3">3</div>Datos</div>
+    <div class="sp" id="sp2"><div class="sn" id="sn2">3</div>Horario</div>
+    <div class="sa">›</div>
+    <div class="sp" id="sp3"><div class="sn" id="sn3">4</div>Datos</div>
   </div>
 </div>
 
 <div class="wrap">
 
-  <!-- PASO 1 -->
-  <div id="p1">
+  <!-- PASO 0: SEDE -->
+  <div id="p0">
     <div class="card">
-      <div class="ch"><div class="ct">¿Qué día te viene bien?</div><div class="cs">Elegí un día para ver los horarios disponibles</div></div>
+      <div class="ch"><div class="ct">¿En qué sede querés ser atendido?</div><div class="cs">Elegí la sucursal que te quede más cómoda</div></div>
       <div class="cb">
+        <div class="sede-grid">
+          <div class="sede-btn" id="sede-caba" onclick="elegirSede('caba')">
+            <div class="sede-nombre">Capital Federal</div>
+            <div class="sede-dir">Callao 433<br>Ciudad Autónoma de Buenos Aires</div>
+          </div>
+          <div class="sede-btn" id="sede-moron" onclick="elegirSede('moron')">
+            <div class="sede-nombre">Morón</div>
+            <div class="sede-dir">9 de Julio 172<br>Planta Baja B</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="p1" class="hidden">
+    <div class="card">
+      <div class="ch">
+        <div class="ct">¿Qué día te viene bien?</div>
+        <div class="cs">Elegí un día para ver los horarios disponibles</div>
+      </div>
+      <div class="cb">
+        <div style="background:#f8f7f4;border:1px solid #eeece6;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#0f1f3d;display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:#9a9690;text-transform:uppercase;letter-spacing:.05em">Sede:</span>
+          <strong id="sede-elegida-label">—</strong>
+        </div>
         <div class="cal-top">
           <button class="cal-nav-btn" onclick="prevMes()">‹</button>
           <div class="cal-mes" id="cal-mes">—</div>
@@ -163,7 +197,8 @@ body{font-family:'DM Sans',sans-serif;background:#faf8f3;color:#2e2c28;min-heigh
         </div>
       </div>
     </div>
-    <div class="vlink"><a href="#" onclick="irBuscar();return false">¿Ya tenés turno? Consultalo o cancelalo →</a></div>
+    <button class="btn-ghost" onclick="irPaso(0)">← Cambiar sede</button>
+    <div class="vlink" style="margin-top:8px"><a href="#" onclick="irBuscar();return false">¿Ya tenés turno? Consultalo o cancelalo →</a></div>
   </div>
 
   <!-- PASO 2 -->
@@ -171,7 +206,7 @@ body{font-family:'DM Sans',sans-serif;background:#faf8f3;color:#2e2c28;min-heigh
     <div class="card">
       <div class="ch"><div class="ct">¿A qué hora preferís?</div><div class="cs">Elegí el horario que mejor te quede</div></div>
       <div class="cb">
-        <div class="fecha-tag">📅 <span id="ftag"></span></div>
+        <div class="fecha-tag"><span id="ftag"></span></div>
         <div id="hload" class="spinner-wrap"><div class="spinner"></div>Cargando horarios...</div>
         <div class="horarios hidden" id="hgrid"></div>
       </div>
@@ -185,8 +220,12 @@ body{font-family:'DM Sans',sans-serif;background:#faf8f3;color:#2e2c28;min-heigh
       <div class="ch"><div class="ct">Tus datos</div></div>
       <div class="cb">
         <div class="resbox">
-          <div class="ricon">📅</div>
-          <div><div class="rlabel">Tu turno reservado</div><div class="rval" id="rval"></div><div class="rsub" id="rsub"></div></div>
+          <div>
+            <div class="rlabel">Tu turno reservado</div>
+            <div class="rval" id="rval"></div>
+            <div class="rsub" id="rsub"></div>
+            <div class="rsub" id="rsub-sede" style="margin-top:3px;color:rgba(255,255,255,.7)"></div>
+          </div>
         </div>
         <div id="ferr" class="ferr"></div>
         <div class="frow">
@@ -259,9 +298,8 @@ const FN=SB+'/functions/v1';
 async function api(tabla, metodo, cuerpo, filtro){
   try{
     const m=metodo||'GET';
-    const f=filtro||'';
-    const filtroLimpio=f.replace(/\?/,'').replace(/=eq\./g,'=').replace(/=gte\./g,'.gte=').replace(/=lte\./g,'.lte=');
-    const url=FN+'/panel-api?tabla='+tabla+'&filtro='+encodeURIComponent(filtroLimpio);
+    const f=(filtro||'').replace(/^\?/,'');
+    const url=`${FN}/api?tabla=${tabla}${f?'&filtro='+encodeURIComponent(f):''}`;
     const r=await fetch(url,{
       method:m,
       headers:{'apikey':KEY,'Content-Type':'application/json'},
@@ -282,11 +320,35 @@ function hoy(){
 
 let anio, mes, fechaSel=null, slotSel=null, turnoCreado=null;
 let bloqueadosMes=[];
+let sedeElegida=null;
 
-// INICIAR
+const SEDES={
+  caba:{nombre:'Capital Federal',dir:'Callao 433, CABA'},
+  moron:{nombre:'Morón',dir:'9 de Julio 172, PB B'}
+};
+
+// INICIAR — muestra paso 0 (sede)
 function init(){
   const n=new Date(); anio=n.getFullYear(); mes=n.getMonth();
-  renderCal();
+  // Mostrar solo p0, ocultar todo lo demás
+  ['p0','p1','p2','p3','p4','pbuscar'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.classList.add('hidden');
+  });
+  document.getElementById('p0').classList.remove('hidden');
+  actualizarPasos(0);
+}
+
+function elegirSede(sede){
+  sedeElegida=sede;
+  document.querySelectorAll('.sede-btn').forEach(b=>b.classList.remove('sel'));
+  document.getElementById('sede-'+sede).classList.add('sel');
+  // Label en el paso 1
+  document.getElementById('sede-elegida-label').textContent=SEDES[sede].nombre+' — '+SEDES[sede].dir;
+  setTimeout(()=>{
+    irPaso(1);
+    renderCal();
+  },250);
 }
 
 // RENDERIZAR CALENDARIO
@@ -420,16 +482,29 @@ async function confirmar(){
   }
 
   const codigo='LEN-'+Math.random().toString(36).substring(2,8).toUpperCase();
-  const res=await api('turnos','POST',{disponibilidad_id:dispId,cliente_nombre:nombre,cliente_apellido:apellido,cliente_telefono:tel,motivo:motivo||null,tipo_creacion:'cliente',estado:'confirmado',codigo_cancelacion:codigo});
+  const res=await api('turnos','POST',{
+    disponibilidad_id:dispId,
+    cliente_nombre:nombre,
+    cliente_apellido:apellido,
+    cliente_telefono:tel,
+    motivo:motivo||null,
+    tipo_creacion:'cliente',
+    estado:'confirmado',
+    codigo_cancelacion:codigo,
+    sede:sedeElegida
+  });
   turnoCreado=res?.[0];
 
   const [y,m,d]=fechaSel.split('-'); const f=new Date(+y,+m-1,+d);
   const fl=f.toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'});
+  const sedeNombre=sedeElegida?SEDES[sedeElegida].nombre:'—';
+  const sedeDir=sedeElegida?SEDES[sedeElegida].dir:'—';
   document.getElementById('codebox').innerHTML=
     '<div class="clabel">Detalle del turno</div>'+
     '<div class="crow"><span class="ckey">Cliente</span><span>'+nombre+' '+apellido+'</span></div>'+
     '<div class="crow"><span class="ckey">Fecha</span><span>'+fl.charAt(0).toUpperCase()+fl.slice(1)+'</span></div>'+
     '<div class="crow"><span class="ckey">Horario</span><span>'+slotSel.inicio+' a '+slotSel.fin+' hs</span></div>'+
+    '<div class="crow"><span class="ckey">Sede</span><span>'+sedeNombre+' · '+sedeDir+'</span></div>'+
     '<div class="crow"><span class="ckey">Teléfono</span><span>'+tel+'</span></div>'+
     '<div class="crow" style="margin-top:10px;padding-top:10px;border-top:1px solid #eeece6">'+
     '<span class="ckey">Nº turno</span><span class="cnum">'+codigo+'</span></div>';
@@ -443,7 +518,7 @@ function irBuscarDesdeExito(){
   irBuscar();
 }
 function irBuscar(){
-  ['p1','p2','p3','p4'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+  ['p0','p1','p2','p3','p4'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add('hidden');});
   document.getElementById('pbuscar').classList.remove('hidden');
   document.getElementById('steps').classList.add('hidden');
   window.scrollTo({top:0,behavior:'smooth'});
@@ -461,9 +536,11 @@ async function buscar(){
   const slot=disp?.[0];
   const [y,m,d]=slot.fecha.split('-'); const f=new Date(+y,+m-1,+d);
   const fl=f.toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'});
+  const sedeInfo=t.sede?SEDES[t.sede]?.nombre+' — '+SEDES[t.sede]?.dir:'';
   document.getElementById('binfo').innerHTML=
     '<div class="bhora">'+slot.hora_inicio.slice(0,5)+' hs</div>'+
     '<div class="bfecha">'+fl.charAt(0).toUpperCase()+fl.slice(1)+'</div>'+
+    (sedeInfo?'<div style="font-size:13px;color:#5a5750;margin-top:4px">'+sedeInfo+'</div>':'')+
     '<div class="bnom">'+t.cliente_nombre+' '+t.cliente_apellido+' · '+(t.cliente_telefono||'')+'</div>'+
     '<div><span class="badge-green">Confirmado</span></div>';
   rb.classList.remove('hidden'); rb.dataset.tid=t.id;
@@ -473,29 +550,37 @@ async function cancelarTurno(){
   const id=document.getElementById('bres').dataset.tid;
   if(!confirm('¿Estás seguro que querés cancelar este turno?'))return;
   await api('turnos','PATCH',{estado:'cancelado'},'?id=eq.'+id);
-  document.getElementById('binfo').innerHTML='<div style="color:#1a6b4a;font-weight:500;padding:8px 0">✓ Turno cancelado correctamente.</div>';
+  document.getElementById('binfo').innerHTML='<div style="color:#1a6b4a;font-weight:500;padding:8px 0">Turno cancelado correctamente.</div>';
   document.getElementById('bcancelBtn').style.display='none';
 }
 
 function irPaso(n){
-  ['p1','p2','p3','p4','pbuscar'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+  ['p0','p1','p2','p3','p4','pbuscar'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add('hidden');});
   document.getElementById('p'+n).classList.remove('hidden');
   document.getElementById('steps').classList.remove('hidden');
-  [1,2,3].forEach(i=>{
-    const p=document.getElementById('sp'+i), s=document.getElementById('sn'+i);
-    p.className='sp'+(i===n?' active':i<n?' done':'');
-    s.textContent=i<n?'✓':i;
-  });
+  actualizarPasos(n);
   window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function actualizarPasos(n){
+  // Pasos: 0=sede, 1=día, 2=horario, 3=datos
+  [0,1,2,3].forEach(i=>{
+    const p=document.getElementById('sp'+i);
+    const s=document.getElementById('sn'+i);
+    if(!p||!s) return;
+    p.className='sp'+(i===n?' active':i<n?' done':'');
+    s.textContent=i<n?'✓':(i+1);
+  });
 }
 
 function prevMes(){mes--;if(mes<0){mes=11;anio--;}renderCal();}
 function nextMes(){mes++;if(mes>11){mes=0;anio++;}renderCal();}
 function reiniciar(){
-  fechaSel=null;slotSel=null;turnoCreado=null;
+  fechaSel=null;slotSel=null;turnoCreado=null;sedeElegida=null;
   ['fn','fa','ft','fm'].forEach(id=>document.getElementById(id).value='');
+  document.querySelectorAll('.sede-btn').forEach(b=>b.classList.remove('sel'));
   document.getElementById('steps').classList.remove('hidden');
-  irPaso(1); renderCal();
+  init();
 }
 
 init();
