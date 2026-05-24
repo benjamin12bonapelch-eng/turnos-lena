@@ -442,11 +442,15 @@ const HORA_INICIO=10,HORA_FIN=17,DIAS_HABILES=[1,2,3,4,5];
 async function api(tabla, metodo, cuerpo, filtro){
   try{
     const m=metodo||'GET';
-    const f=(filtro||'').replace(/^\?/,'');
-    const url=`${FN}/api?tabla=${tabla}${f?'&filtro='+encodeURIComponent(f):''}`;
-    const r=await fetch(url,{
+    const f=filtro||'';
+    const r=await fetch(`${SB}/rest/v1/${tabla}${f}`,{
       method:m,
-      headers:{'apikey':KEY,'Content-Type':'application/json'},
+      headers:{
+        'apikey':KEY,
+        'Authorization':'Bearer '+KEY,
+        'Content-Type':'application/json',
+        'Prefer':m==='POST'?'return=representation':''
+      },
       body:cuerpo?JSON.stringify(cuerpo):null
     });
     const txt=await r.text();
@@ -469,17 +473,21 @@ async function login(){
   const err=document.getElementById('login-err'); err.style.display='none';
   const btn=document.querySelector('.btn-login'); btn.textContent='Ingresando...'; btn.disabled=true;
   try{
-    const r=await fetch(`${FN}/login`,{
+    const r=await fetch(`${SB}/rest/v1/rpc/login_usuario`,{
       method:'POST',
-      headers:{'apikey':KEY,'Content-Type':'application/json'},
-      body:JSON.stringify({email,password:pass})
+      headers:{
+        'apikey':KEY,
+        'Authorization':'Bearer '+KEY,
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify({p_email:email, p_password:pass})
     });
     const data=await r.json();
-    if(!data.user){
+    if(!data||!data.length){
       err.textContent='Email o contraseña incorrectos.';
       err.style.display='block';
     } else {
-      user=data.user; initPanel();
+      user=data[0]; initPanel();
     }
   }catch(e){
     err.textContent='Error de conexión. Intentá de nuevo.';
