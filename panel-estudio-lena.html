@@ -263,6 +263,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--g800);
             </div>
             <div class="f-campo"><label>Teléfono</label><input type="tel" id="nt-tel" placeholder="11 1234-5678"></div>
             <div class="f-campo"><label>Motivo</label><textarea id="nt-motivo" rows="3" placeholder="Accidente de tránsito..."></textarea></div>
+            <div class="f-campo"><label>Abogado asignado</label><select id="nt-abogado"><option value="">— Sin asignar —</option></select></div>
             <div style="display:flex;justify-content:flex-end"><button class="btn btn-gold" onclick="crearTurno()">Confirmar turno</button></div>
           </div>
         </div>
@@ -351,7 +352,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--g800);
     </div>
     <div class="f-campo"><label>Rol</label>
       <select id="me-r">
-        <option value="empleado">Empleado</option>
+        <option value="asociado">Asociado</option>
         <option value="especial">Especial</option>
         <option value="secretaria">Secretaria</option>
         <option value="director">Director</option>
@@ -433,6 +434,7 @@ function initPanel(){
   document.getElementById('sb-rol').textContent=user.rol;
   document.getElementById('sb-av').textContent=user.nombre.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   if(['director','especial'].includes(user.rol)){document.getElementById('nb-emp').classList.remove('hidden');document.getElementById('nav-lbl-admin').classList.remove('hidden');}
+  if(user.rol==='secretaria'){document.getElementById('nav-lbl-admin').classList.remove('hidden');}
   if(user.rol==='director') document.getElementById('nb-disp').classList.remove('hidden');
   const n=new Date();agY=n.getFullYear();agM=n.getMonth();
   verSec('agenda');
@@ -454,6 +456,7 @@ function verSec(s){
   if(s==='agenda') loadAgenda();
   if(s==='disp') initDisp();
   if(s==='emp') loadEmp();
+  if(s==='nuevo') cargarAbogados();
 }
 
 // AGENDA
@@ -504,7 +507,8 @@ function renderAgGrid(allB,allT,dispMes){
       if(conf) e.innerHTML+=`<div class="ag-count turno">${conf} turno${conf>1?'s':''}</div>`;
       if(bloqDia.length>0) e.innerHTML+='<div class="ag-count" style="background:#fff8ec;color:#7a5c1a">Parcial</div>';
     }
-    e.onclick=()=>abrirPanel(ds,dD,dT,bloqDia);
+    const dTFiltered=user.rol==='asociado'?dT.filter(t=>!t.abogado_asignado_id||t.abogado_asignado_id===user.id):dT;
+    e.onclick=()=>abrirPanel(ds,dD,dTFiltered,bloqDia);
     g.appendChild(e);
   }
 }
@@ -526,6 +530,8 @@ function abrirPanel(ds,dD,dT,bloqDia){
       body.appendChild(div);
     } else if(t){
       const canAction=['director','secretaria','especial'].includes(user.rol);
+      const esAsociado=user.rol==='asociado';
+      if(esAsociado&&t.abogado_asignado_id&&t.abogado_asignado_id!==user.id) return; // asociado solo ve sus turnos
       const esPasado=ds<=hoy();
       const div=document.createElement('div');div.className='turno-card';
       let estadoBadge='<span class="badge badge-green">Confirmado</span>';
@@ -539,6 +545,7 @@ function abrirPanel(ds,dD,dT,bloqDia){
         <div class="tc-tel">${t.cliente_telefono||'—'}</div>
         ${t.motivo?`<div class="tc-motivo">${t.motivo}</div>`:''}
         ${t.sede?`<div style="margin-top:6px;font-size:12px;font-weight:600;color:var(--g600)">📍 ${t.sede==='caba'?'Capital Federal':'Morón'}</div>`:''}
+        ${t.abogado_nombre?`<div style="margin-top:6px;font-size:12px;font-weight:600;color:var(--navy)">⚖️ Abogado: ${t.abogado_nombre}</div>`:''}
         ${t.expediente_nro?`
           <div style="margin-top:8px;padding:8px 10px;background:rgba(201,168,76,.1);border-radius:8px;border-left:3px solid var(--gold)">
             <div style="font-size:10px;color:var(--g400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Expediente vinculado</div>
@@ -632,6 +639,20 @@ async function guardarExpediente(){
   loadAgenda();
 }
 
+// ABOGADOS
+async function cargarAbogados(){
+  const sel=document.getElementById('nt-abogado');
+  if(!sel) return;
+  const users=await sb('usuarios','GET',null,'?activo=eq.true&order=nombre');
+  sel.innerHTML='<option value="">— Sin asignar —</option>';
+  (users||[]).forEach(u=>{
+    const o=document.createElement('option');
+    o.value=u.id;
+    o.textContent=u.nombre+' ('+u.rol+')';
+    sel.appendChild(o);
+  });
+}
+
 // CARPETA
 let carpetaSelId=null,carpetaSelNro=null,buscarTimer=null;
 async function buscarCarpeta(q){
@@ -702,7 +723,8 @@ async function crearTurno(){
     creado_por:user.id,tipo_creacion:'empleado',estado:'confirmado',
     codigo_cancelacion:codigo,
     expediente_id:carpetaSelId||null,
-    expediente_nro:carpetaSelNro||null
+    expediente_nro:carpetaSelNro||null,
+    abogado_asignado_id:document.getElementById('nt-abogado').value||null
   });
   toast('Turno creado');
   ['nt-fecha','nt-nombre','nt-apellido','nt-tel','nt-motivo'].forEach(id=>document.getElementById(id).value='');
@@ -807,7 +829,7 @@ async function loadEmp(){
   document.getElementById('ct-action').innerHTML=user.rol==='director'?`<button class="btn btn-gold btn-sm" onclick="abrirModal()" style="padding:8px 14px;font-size:13px">+ Agregar</button>`:'';
   const list=document.getElementById('emp-list');list.innerHTML='';
   const u=await sb('usuarios','GET',null,'?order=creado_en');
-  const rb={director:'badge-gold',secretaria:'badge-navy',especial:'badge-purple',empleado:'badge-gray'};
+  const rb={director:'badge-gold',secretaria:'badge-navy',especial:'badge-purple',asociado:'badge-gray',empleado:'badge-gray'};
   (u||[]).forEach(x=>{
     const div=document.createElement('div');div.className='emp-row';
     const ini=x.nombre.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
