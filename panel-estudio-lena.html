@@ -552,6 +552,16 @@ function abrirPanel(ds,dD,dT,bloqDia){
             <div style="font-size:13px;font-weight:700;color:var(--navy)">${t.expediente_nro}</div>
           </div>`:
           (canAction?`<button onclick="abrirModalExp('${t.id}')" class="btn-sm" style="margin-top:8px;background:var(--gold-pale);color:#7a5c1a;border:1px solid rgba(201,168,76,.3);width:100%;justify-content:center">📎 Vincular expediente</button>`:'')}
+        ${canAction?`
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--g100)">
+          <div style="font-size:10px;color:var(--g400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">⚖️ Abogado asignado</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="sel-abogado-${t.id}" style="flex:1;background:var(--g50);border:1.5px solid var(--g200);border-radius:var(--r);padding:8px 10px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--g800);outline:none">
+              <option value="">— Sin asignar —</option>
+            </select>
+            <button onclick="asignarAbogado('${t.id}')" class="btn-sm" style="background:var(--navy);color:#fff;white-space:nowrap">Guardar</button>
+          </div>
+        </div>`:''}`
         <div class="tc-footer">${estadoBadge}
           ${canAction&&t.estado==='confirmado'?`<button class="btn-danger-sm" onclick="cancelarT('${t.id}','${ds}')">Cancelar turno</button>`:''}
         </div>
@@ -561,6 +571,8 @@ function abrirPanel(ds,dD,dT,bloqDia){
           <button onclick="marcarTurno('${t.id}','ausente','${ds}')" class="btn-sm" style="flex:1;background:var(--red-light);color:var(--red);border:1px solid rgba(192,57,43,.2)">✗ No se presentó</button>
         </div>`:''}`;
       body.appendChild(div);
+      // Cargar el select de abogados para este turno
+      if(canAction) setTimeout(()=>poblarSelectAbogados(t.id, t.abogado_asignado_id),100);
     } else {
       const div=document.createElement('div');div.className='slot-libre';
       div.innerHTML=`<span style="font-size:14px">${s.inicio} hs</span><span class="badge badge-gray">Libre</span>`;
@@ -570,6 +582,29 @@ function abrirPanel(ds,dD,dT,bloqDia){
   document.getElementById('side-panel').classList.add('open');
 }
 function cerrarPanel(){document.getElementById('side-panel').classList.remove('open');}
+
+async function poblarSelectAbogados(turnoId, abogadoActualId){
+  const sel=document.getElementById('sel-abogado-'+turnoId);
+  if(!sel) return;
+  const users=await sb('usuarios','GET',null,'?activo=eq.true&order=nombre');
+  sel.innerHTML='<option value="">— Sin asignar —</option>';
+  (users||[]).forEach(u=>{
+    const o=document.createElement('option');
+    o.value=u.id;
+    o.textContent=u.nombre+' ('+u.rol+')';
+    if(u.id===abogadoActualId) o.selected=true;
+    sel.appendChild(o);
+  });
+}
+
+async function asignarAbogado(turnoId){
+  const sel=document.getElementById('sel-abogado-'+turnoId);
+  if(!sel) return;
+  const abogadoId=sel.value||null;
+  await sb('turnos','PATCH',{abogado_asignado_id:abogadoId},`?id=eq.${turnoId}`);
+  toast('Abogado asignado');
+  loadAgenda();
+}
 
 // CANCELAR TURNO — corregido, va directo a Supabase REST
 async function cancelarT(id,ds){
