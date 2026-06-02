@@ -422,8 +422,8 @@ function generarSlots(fecha){
 let user=null,agY,agM,dpY,dpM,dpSel=null,dpSelDate=null;
 // Mapa id_expediente -> {nombre, nroexp} para mostrar el cliente vinculado en cada turno
 let expMap={};
-// URL de la app de expedientes (para el botón "Abrir expediente"). Se completa cuando se confirme.
-const EXP_APP_URL='';
+// URL de la app de expedientes (para el botón "Abrir expediente").
+const EXP_APP_URL='https://estudiolena.github.io/expedientes/';
 
 async function login(){
   const email=document.getElementById('l-email').value.trim();
