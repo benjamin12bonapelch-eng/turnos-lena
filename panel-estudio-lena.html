@@ -154,6 +154,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--g800);
   .side-panel{width:100%;border-left:none}
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -386,6 +387,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--g800);
 const SB='https://iboydjjeaeeayxjvaykr.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlib3lkamplYWVlYXl4anZheWtyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NDY3NjAsImV4cCI6MjA5NDAyMjc2MH0.e8Yy8E4oXvJWgY-AXWhlOtoLBZeZY8w1liLHM4JPY84';
 const FN=SB+'/functions/v1';
+// Cliente de Supabase Auth (sesión real) — separado del helper sb() de abajo
+const sbAuth=supabase.createClient(SB,KEY);
+let _accessToken=null;
+// Mantener el token fresco cuando Supabase lo renueva automáticamente
+sbAuth.auth.onAuthStateChange((_e,session)=>{ _accessToken=session?.access_token||null; });
 const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const HORA_INICIO=10,HORA_FIN=19,DIAS_HABILES=[1,2,3,4,5];
 
@@ -394,7 +400,10 @@ async function sb(tabla,metodo,cuerpo,filtro){
   try{
     const m=metodo||'GET';
     const f=filtro||'';
-    const headers={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'};
+    // Si hay sesión iniciada, usamos el token del usuario real (para que el RLS lo reconozca).
+    // El apikey sigue siendo el anon key (requerido por Supabase como identificador del proyecto).
+    const bearer=_accessToken||KEY;
+    const headers={'apikey':KEY,'Authorization':'Bearer '+bearer,'Content-Type':'application/json'};
     if(m==='POST') headers['Prefer']='return=representation';
     if(m==='PATCH') headers['Prefer']='return=representation';
     const r=await fetch(`${SB}/rest/v1/${tabla}${f}`,{method:m,headers,body:cuerpo?JSON.stringify(cuerpo):null});
@@ -418,14 +427,44 @@ async function login(){
   const err=document.getElementById('login-err'); err.style.display='none';
   const btn=document.querySelector('.btn-login'); btn.textContent='Ingresando...'; btn.disabled=true;
   try{
-    const r=await fetch(`${FN}/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass})});
-    const data=await r.json();
-    if(!data.user){err.textContent='Email o contraseña incorrectos.';err.style.display='block';}
-    else{user=data.user;initPanel();}
+    const {data:authData,error:authErr}=await sbAuth.auth.signInWithPassword({email,password:pass});
+    if(authErr||!authData?.user){
+      err.textContent='Email o contraseña incorrectos.';err.style.display='block';
+      btn.textContent='Ingresar al panel';btn.disabled=false;return;
+    }
+    const ok=await cargarSesion(authData.session);
+    if(!ok){
+      err.textContent='Tu cuenta no está habilitada para el panel.';err.style.display='block';
+      await sbAuth.auth.signOut();
+      btn.textContent='Ingresar al panel';btn.disabled=false;return;
+    }
+    initPanel();
   }catch(e){err.textContent='Error de conexión.';err.style.display='block';}
   btn.textContent='Ingresar al panel';btn.disabled=false;
 }
-function logout(){user=null;document.getElementById('login-screen').style.display='flex';document.getElementById('panel-app').style.display='none';}
+
+// A partir de la sesión de Auth, carga la ficha del usuario desde la tabla usuarios
+// (mantenemos usuarios.id como identidad interna del panel, así los turnos asignados no se rompen).
+async function cargarSesion(session){
+  if(!session?.user) return false;
+  _accessToken=session.access_token;
+  const rows=await sb('usuarios','GET',null,`?auth_id=eq.${session.user.id}&activo=eq.true`);
+  if(!rows||!rows.length){ _accessToken=null; return false; }
+  user=rows[0];
+  return true;
+}
+
+function logout(){
+  sbAuth.auth.signOut();
+  _accessToken=null; user=null;
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('panel-app').style.display='none';
+}
+
+// Reanudar sesión si ya estaba logueado (no tiene que volver a entrar cada vez)
+sbAuth.auth.getSession().then(async ({data:{session}})=>{
+  if(session?.user){ const ok=await cargarSesion(session); if(ok) initPanel(); }
+});
 
 function initPanel(){
   document.getElementById('login-screen').style.display='none';
@@ -914,9 +953,33 @@ function cerrarModal(){document.getElementById('modal-emp').classList.remove('op
 async function guardarEmp(){
   const id=document.getElementById('me-id').value,n=document.getElementById('me-n').value.trim(),e=document.getElementById('me-e').value.trim(),p=document.getElementById('me-p').value,r=document.getElementById('me-r').value;
   if(!n){toast('Completá el nombre',true);return;}
-  if(id){const cambios={nombre:n,rol:r};if(p)cambios.password_hash=p;await sb('usuarios','PATCH',cambios,`?id=eq.${id}`);toast('Empleado actualizado');}
-  else{if(!e||!p){toast('Completá todos los campos',true);return;}await sb('usuarios','POST',{nombre:n,email:e,password_hash:p,rol:r});toast('Empleado agregado');}
-  cerrarModal();loadEmp();
+  const btn=document.querySelector('#modal-emp .btn-gold');const txt=btn?btn.textContent:'';
+  if(btn){btn.textContent='Guardando...';btn.disabled=true;}
+  try{
+    let resp;
+    if(id){
+      // Editar: actualiza nombre/rol (y contraseña si la cargaste)
+      resp=await fnEmpleado({action:'actualizar',usuario_id:id,nombre:n,rol:r,password:p||undefined});
+    }else{
+      // Nuevo: crea la cuenta de acceso real + la ficha, todo de una
+      if(!e||!p){toast('Completá nombre, email y contraseña',true);if(btn){btn.textContent=txt;btn.disabled=false;}return;}
+      resp=await fnEmpleado({action:'crear',nombre:n,email:e,password:p,rol:r});
+    }
+    if(resp&&resp.ok){toast(id?'Empleado actualizado':'Empleado creado');cerrarModal();loadEmp();}
+    else{toast((resp&&resp.error)||'No se pudo guardar',true);}
+  }catch(err){toast('Error de conexión',true);}
+  if(btn){btn.textContent=txt;btn.disabled=false;}
+}
+
+// Llama a la función de servidor con la sesión del usuario actual.
+// La creación de cuentas se hace del lado del servidor (la clave de admin nunca toca el navegador).
+async function fnEmpleado(payload){
+  const r=await fetch(`${FN}/gestionar-empleado`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+(_accessToken||KEY)},
+    body:JSON.stringify(payload)
+  });
+  try{return await r.json();}catch(e){return {error:'Respuesta inválida del servidor'};}
 }
 function abrirModalPass(){document.getElementById('modal-pass').classList.add('open');document.getElementById('pp-error').style.display='none';}
 function cerrarModalPass(){document.getElementById('modal-pass').classList.remove('open');}
