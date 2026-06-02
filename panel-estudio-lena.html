@@ -420,6 +420,10 @@ function generarSlots(fecha){
 }
 
 let user=null,agY,agM,dpY,dpM,dpSel=null,dpSelDate=null;
+// Mapa id_expediente -> {nombre, nroexp} para mostrar el cliente vinculado en cada turno
+let expMap={};
+// URL de la app de expedientes (para el botón "Abrir expediente"). Se completa cuando se confirme.
+const EXP_APP_URL='';
 
 async function login(){
   const email=document.getElementById('l-email').value.trim();
@@ -505,11 +509,14 @@ async function loadAgenda(){
   const hs=hoy();
   const last=new Date(agY,agM+1,0).getDate();
   const f1=`${agY}-${String(agM+1).padStart(2,'0')}-01`,f2=`${agY}-${String(agM+1).padStart(2,'0')}-${String(last).padStart(2,'0')}`;
-  const [bloq,turnos,dispMes]=await Promise.all([
+  const [bloq,turnos,dispMes,exps]=await Promise.all([
     sb('dias_bloqueados','GET',null,`?fecha=gte.${f1}&fecha=lte.${f2}`),
     sb('turnos','GET',null,'?estado=eq.confirmado'),
-    sb('disponibilidad','GET',null,`?fecha=gte.${f1}&fecha=lte.${f2}`)
+    sb('disponibilidad','GET',null,`?fecha=gte.${f1}&fecha=lte.${f2}`),
+    sb('expedientes','GET',null,'?select=id,nombre,nroexp')
   ]);
+  expMap={};
+  (exps||[]).forEach(e=>{ expMap[e.id]={nombre:e.nombre,nroexp:e.nroexp}; });
   const allB=bloq||[],allT=turnos||[],allD=dispMes||[];
   const dIds=allD.map(d=>d.id);
   const tMes=allT.filter(t=>dIds.includes(t.disponibilidad_id));
@@ -586,10 +593,21 @@ function abrirPanel(ds,dD,dT,bloqDia){
       if(t.motivo){const mo=document.createElement('div');mo.className='tc-motivo';mo.textContent=t.motivo;div.appendChild(mo);}
       if(t.sede){const se=document.createElement('div');se.style.cssText='margin-top:6px;font-size:12px;font-weight:600;color:var(--g600)';se.textContent='📍 '+(t.sede==='caba'?'Capital Federal':'Morón');div.appendChild(se);}
 
-      if(t.expediente_nro){
+      if(t.expediente_id){
+        const info=expMap[t.expediente_id]||{};
+        const titulo=(info.nombre&&info.nombre.trim())?info.nombre:(t.expediente_nro||'Expediente vinculado');
         const ex=document.createElement('div');ex.style.cssText='margin-top:8px;padding:8px 10px;background:rgba(201,168,76,.1);border-radius:8px;border-left:3px solid var(--gold)';
-        ex.innerHTML='<div style="font-size:10px;color:var(--g400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Expediente vinculado</div><div style="font-size:13px;font-weight:700;color:var(--navy)">'+t.expediente_nro+'</div>';
+        const exLbl=document.createElement('div');exLbl.style.cssText='font-size:10px;color:var(--g400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px';exLbl.textContent='📎 Expediente vinculado';ex.appendChild(exLbl);
+        const exNom=document.createElement('div');exNom.style.cssText='font-size:13px;font-weight:700;color:var(--navy)';exNom.textContent=titulo;ex.appendChild(exNom);
+        if(info.nroexp&&String(info.nroexp).trim()){const exNro=document.createElement('div');exNro.style.cssText='font-size:11px;color:var(--g600);margin-top:1px';exNro.textContent='N° '+info.nroexp;ex.appendChild(exNro);}
         div.appendChild(ex);
+        if(EXP_APP_URL){
+          const btnOpen=document.createElement('button');btnOpen.className='btn-sm';
+          btnOpen.style.cssText='margin-top:6px;background:var(--navy);color:#fff;border:none;width:100%;justify-content:center';
+          btnOpen.textContent='📂 Abrir expediente del cliente';
+          btnOpen.onclick=()=>window.open(EXP_APP_URL+(EXP_APP_URL.includes('?')?'&':'?')+'exp='+t.expediente_id,'_blank');
+          div.appendChild(btnOpen);
+        }
       } else if(canAction){
         const btnExp=document.createElement('button');btnExp.className='btn-sm';
         btnExp.style.cssText='margin-top:8px;background:var(--gold-pale);color:#7a5c1a;border:1px solid rgba(201,168,76,.3);width:100%;justify-content:center';
