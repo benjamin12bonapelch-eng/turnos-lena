@@ -413,6 +413,15 @@ async function sb(tabla,metodo,cuerpo,filtro){
 }
 
 function hoy(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+// Visibilidad de turnos: los asociados solo ven turnos asignados a ellos
+// o vinculados a un expediente que tienen asignado. El resto del equipo ve todo.
+let misExpIds=new Set();
+function turnoVisible(t){
+  if(user?.rol!=='asociado') return true;
+  if(t.abogado_asignado_id===user.id) return true;
+  if(t.expediente_id&&misExpIds.has(t.expediente_id)) return true;
+  return false;
+}
 function generarSlots(fecha){
   const slots=[];
   for(let h=HORA_INICIO;h<HORA_FIN;h++) slots.push({inicio:`${String(h).padStart(2,'0')}:00`,fin:`${String(h+1).padStart(2,'0')}:00`,fecha});
@@ -513,11 +522,14 @@ async function loadAgenda(){
     sb('dias_bloqueados','GET',null,`?fecha=gte.${f1}&fecha=lte.${f2}`),
     sb('turnos','GET',null,'?estado=eq.confirmado'),
     sb('disponibilidad','GET',null,`?fecha=gte.${f1}&fecha=lte.${f2}`),
-    sb('expedientes','GET',null,'?select=id,nombre,nroexp')
+    sb('expedientes','GET',null,'?select=id,nombre,nroexp,asignado_a')
   ]);
-  expMap={};
-  (exps||[]).forEach(e=>{ expMap[e.id]={nombre:e.nombre,nroexp:e.nroexp}; });
-  const allB=bloq||[],allT=turnos||[],allD=dispMes||[];
+  expMap={};misExpIds=new Set();
+  (exps||[]).forEach(e=>{
+    expMap[e.id]={nombre:e.nombre,nroexp:e.nroexp};
+    if(e.asignado_a&&e.asignado_a===user.auth_id) misExpIds.add(e.id);
+  });
+  const allB=bloq||[],allT=(turnos||[]).filter(turnoVisible),allD=dispMes||[];
   const dIds=allD.map(d=>d.id);
   const tMes=allT.filter(t=>dIds.includes(t.disponibilidad_id));
   const dispHoy=allD.filter(d=>d.fecha===hs).map(d=>d.id);
@@ -553,8 +565,7 @@ function renderAgGrid(allB,allT,dispMes){
       if(conf) e.innerHTML+=`<div class="ag-count turno">${conf} turno${conf>1?'s':''}</div>`;
       if(bloqDia.length>0) e.innerHTML+='<div class="ag-count" style="background:#fff8ec;color:#7a5c1a">Parcial</div>';
     }
-    const dTFiltered=user.rol==='asociado'?dT.filter(t=>!t.abogado_asignado_id||t.abogado_asignado_id===user.id):dT;
-    e.onclick=()=>abrirPanel(ds,dD,dTFiltered,bloqDia);
+    e.onclick=()=>abrirPanel(ds,dD,dT,bloqDia);
     g.appendChild(e);
   }
 }
@@ -576,8 +587,7 @@ function abrirPanel(ds,dD,dT,bloqDia){
       body.appendChild(div);
     } else if(t){
       const canAction=['director','secretaria','especial'].includes(user.rol);
-      const esAsociado=user.rol==='asociado';
-      if(esAsociado&&t.abogado_asignado_id&&t.abogado_asignado_id!==user.id) return;
+      if(!turnoVisible(t)) return;
       const esPasado=ds<=hoy();
       const div=document.createElement('div');div.className='turno-card';
 
